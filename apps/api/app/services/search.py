@@ -41,6 +41,7 @@ class PgvectorSearchService(SearchService):
                 score=float(row["score"]),
                 image_id=row["image_id"],
                 name=row["name"],
+                slug=row.get("slug"),
                 thumbnail_url=row["thumbnail_url"],
                 price_cents=int(row["price_cents"]) if row.get("price_cents") is not None else None,
                 currency=row.get("currency"),

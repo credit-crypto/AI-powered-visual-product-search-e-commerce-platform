@@ -8,6 +8,7 @@ class VisualSearchResultItem(BaseModel):
     score: float
     image_id: UUID | None = None
     name: str | None = None
+    slug: str | None = None
     thumbnail_url: str | None = None
     price_cents: int | None = None
     currency: str | None = None

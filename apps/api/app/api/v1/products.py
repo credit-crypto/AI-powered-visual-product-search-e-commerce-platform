@@ -25,11 +25,27 @@ class ProductDetail(ProductSummary):
     default_sku: str | None = None
 
 
+def _to_detail(row: dict) -> ProductDetail:
+    return ProductDetail(
+        id=row["id"],
+        name=row["name"],
+        slug=row["slug"],
+        description=row.get("description"),
+        category_id=row.get("category_id"),
+        price_cents=int(row.get("price_cents") or 0),
+        currency=row.get("currency") or "USD",
+        thumbnail_url=row.get("thumbnail_url"),
+        image_urls=[row["thumbnail_url"]] if row.get("thumbnail_url") else [],
+        default_variant_id=row.get("default_variant_id"),
+        default_sku=row.get("default_sku"),
+    )
+
+
 @router.get("", response_model=list[ProductSummary])
 async def list_products(
     q: str | None = Query(default=None, description="Text search query"),
     category_id: UUID | None = None,
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> list[ProductSummary]:
     rows = catalogue_repo.list_products(
@@ -49,21 +65,17 @@ async def list_products(
     ]
 
 
+@router.get("/slug/{slug}", response_model=ProductDetail)
+async def get_product_by_slug(slug: str) -> ProductDetail:
+    row = catalogue_repo.get_product_by_slug(slug)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Product slug '{slug}' not found")
+    return _to_detail(row)
+
+
 @router.get("/{product_id}", response_model=ProductDetail)
 async def get_product(product_id: UUID) -> ProductDetail:
     row = catalogue_repo.get_product(product_id)
     if row is None:
         raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
-    return ProductDetail(
-        id=row["id"],
-        name=row["name"],
-        slug=row["slug"],
-        description=row.get("description"),
-        category_id=row.get("category_id"),
-        price_cents=int(row.get("price_cents") or 0),
-        currency=row.get("currency") or "USD",
-        thumbnail_url=row.get("thumbnail_url"),
-        image_urls=[row["thumbnail_url"]] if row.get("thumbnail_url") else [],
-        default_variant_id=row.get("default_variant_id"),
-        default_sku=row.get("default_sku"),
-    )
+    return _to_detail(row)

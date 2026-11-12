@@ -9,6 +9,7 @@ export interface VisualSearchResultItem {
   score: number;
   image_id?: string | null;
   name?: string | null;
+  slug?: string | null;
   thumbnail_url?: string | null;
   price_cents?: number | null;
   currency?: string | null;
@@ -61,12 +62,33 @@ export interface ProductSummary {
   default_variant_id?: string | null;
 }
 
-export async function listProducts(): Promise<ProductSummary[]> {
-  const response = await apiFetch("/api/v1/products", { cache: "no-store" });
+export interface ProductDetail extends ProductSummary {
+  description?: string | null;
+  category_id?: string | null;
+  image_urls?: string[];
+  default_sku?: string | null;
+}
+
+export async function listProducts(q?: string, limit = 100): Promise<ProductSummary[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (q?.trim()) params.set("q", q.trim());
+  const response = await apiFetch(`/api/v1/products?${params.toString()}`, {
+    cache: "no-store",
+  });
   if (!response.ok) {
     throw new Error(`Failed to load products (${response.status})`);
   }
   return response.json() as Promise<ProductSummary[]>;
+}
+
+export async function getProductBySlug(slug: string): Promise<ProductDetail> {
+  const response = await apiFetch(`/api/v1/products/slug/${encodeURIComponent(slug)}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Product not found (${response.status})`);
+  }
+  return response.json() as Promise<ProductDetail>;
 }
 
 export interface CartItem {

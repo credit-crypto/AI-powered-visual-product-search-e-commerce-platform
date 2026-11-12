@@ -68,25 +68,31 @@ def create_product(
     }
 
 
+_PRODUCT_SELECT = """
+    SELECT p.id, p.name, p.slug, p.description, p.category_id, p.status,
+           v.id AS default_variant_id, v.sku AS default_sku,
+           v.price_cents, v.currency,
+           (
+             SELECT pi.url FROM product_images pi
+             WHERE pi.product_id = p.id
+             ORDER BY pi.is_primary DESC, pi.position ASC, pi.created_at ASC
+             LIMIT 1
+           ) AS thumbnail_url
+    FROM products p
+    LEFT JOIN product_variants v ON v.product_id = p.id AND v.is_default = true
+"""
+
+
 def get_product(product_id: UUID) -> dict[str, Any] | None:
     with get_cursor() as cur:
-        cur.execute(
-            """
-            SELECT p.id, p.name, p.slug, p.description, p.category_id, p.status,
-                   v.id AS default_variant_id, v.sku AS default_sku,
-                   v.price_cents, v.currency,
-                   (
-                     SELECT pi.url FROM product_images pi
-                     WHERE pi.product_id = p.id
-                     ORDER BY pi.is_primary DESC, pi.position ASC, pi.created_at ASC
-                     LIMIT 1
-                   ) AS thumbnail_url
-            FROM products p
-            LEFT JOIN product_variants v ON v.product_id = p.id AND v.is_default = true
-            WHERE p.id = %s
-            """,
-            (product_id,),
-        )
+        cur.execute(f"{_PRODUCT_SELECT} WHERE p.id = %s", (product_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def get_product_by_slug(slug: str) -> dict[str, Any] | None:
+    with get_cursor() as cur:
+        cur.execute(f"{_PRODUCT_SELECT} WHERE p.slug = %s", (slug,))
         row = cur.fetchone()
         return dict(row) if row else None
 
@@ -240,6 +246,7 @@ def search_similar(
             SELECT DISTINCT ON (ranked.product_id)
                 ranked.product_id,
                 ranked.name,
+                ranked.slug,
                 ranked.image_id,
                 ranked.thumbnail_url,
                 ranked.price_cents,
@@ -249,6 +256,7 @@ def search_similar(
                 SELECT
                     p.id AS product_id,
                     p.name,
+                    p.slug,
                     pi.id AS image_id,
                     pi.url AS thumbnail_url,
                     COALESCE(v.price_cents, 0) AS price_cents,
