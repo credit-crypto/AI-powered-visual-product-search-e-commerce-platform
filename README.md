@@ -7,11 +7,13 @@ visual-shop/
 ├── apps/storefront/     # Next.js (web) + Capacitor (iOS/Android)
 ├── apps/api/            # FastAPI + Celery worker + seed script
 ├── packages/api-contracts/
-├── infrastructure/      # docker-compose (Postgres/pgvector, Redis, MinIO, API, worker)
+├── infrastructure/      # docker-compose (MongoDB, Redis, MinIO, API, worker)
 └── README.md
 ```
 
-## Demo: visual search happy path
+**Stack notes:** catalogue + carts/orders live in **MongoDB**. Default embeddings use the offline **perceptual stub** (no HuggingFace/SigLIP2 download). Visual search scores L2-normalized 768-d vectors with in-process cosine similarity (Atlas Vector Search optional later).
+
+## Demo: offline happy path
 
 ### 1. Start infrastructure
 
@@ -19,15 +21,15 @@ visual-shop/
 docker compose -f infrastructure/docker-compose.yml up --build
 ```
 
-Services:
-
 | Service | URL |
 | --- | --- |
 | API + docs | http://localhost:8000/docs |
 | Health | http://localhost:8000/health |
-| MinIO API / console | http://localhost:9000 / http://localhost:9001 (`minioadmin` / `minioadmin`) |
-| Postgres | `localhost:5432` — `visualshop` / `visualshop` / `visualshop` |
+| MinIO API / console | http://localhost:9000 / http://localhost:9001 |
+| MongoDB | `mongodb://localhost:27017` → db `visualshop` |
 | Redis | `localhost:6379` |
+
+Local/agent demo without Docker: run MongoDB + Redis locally, set `STORAGE_BACKEND=filesystem`, `EMBEDDING_BACKEND=perceptual`, `INDEX_SYNC=1`.
 
 ### 2. Seed a sample catalogue
 
@@ -35,81 +37,85 @@ Services:
 docker compose -f infrastructure/docker-compose.yml --profile seed run --rm seed
 ```
 
-Or from the host (with the same env as `.env.example`):
+Or from the host:
 
 ```bash
 cd apps/api
 pip install -r requirements.txt
+cp .env.example .env   # MONGODB_URI, EMBEDDING_BACKEND=perceptual
 PYTHONPATH=. python -m scripts.seed_catalogue
 ```
 
-This creates 8 synthetic products, uploads JPEGs to MinIO, and writes **768-d** embeddings into `image_embeddings` (inline by default so search works immediately).
+Creates **~100** products (`SEED_COUNT=N` to override), stores JPEGs, and writes **768-d** perceptual embeddings into `image_embeddings`.
 
 ### 3. Storefront
 
 ```bash
 npm install
-cp apps/storefront/.env.example apps/storefront/.env.local   # NEXT_PUBLIC_API_URL=http://localhost:8000
+cp apps/storefront/.env.example apps/storefront/.env.local
 npm run dev:storefront
 ```
 
-Open http://localhost:3000/visual-search → upload any seeded-style image (or a photo of a similar colour/shape) → `/search/results` shows the top matches.
+Open http://localhost:3000/products → camera/image button → `/search/results`.
 
-### 4. API-only smoke test
+Admin upload UI (MVP, no auth): http://localhost:3000/admin
+
+### 4. Cart + checkout (stub payment)
+
+1. http://localhost:3000/products → add to cart  
+2. http://localhost:3000/cart → checkout  
+3. Stub pay → `/account/orders?paid=1`
+
+Guest cart uses `X-Session-Token` (storefront `localStorage`).
+
+### 5. API smoke test
 
 ```bash
-# after seed — reuse a product image from MinIO or a local JPEG
 curl -s -F "file=@/path/to/query.jpg" -F "limit=20" \
   http://localhost:8000/api/v1/search/image | jq .
 ```
 
-## Embeddings: perceptual (default) vs SigLIP2
+## Embeddings: perceptual (default, offline) vs SigLIP2 (online opt-in)
 
-| `EMBEDDING_BACKEND` | Model id stored in DB | When to use |
+| `EMBEDDING_BACKEND` | Model id | When |
 | --- | --- | --- |
-| `perceptual` (default) | `visual-shop/perceptual-v1` | Local Docker demo / CI — CPU-only, no weight download. Colour + spatial features projected to **VECTOR(768)**, L2-normalized. Similar-looking seed images rank near each other. |
-| `siglip2` | `google/siglip2-base-patch16-224` | Real visual encoder. Install `apps/api/requirements-ml.txt`, set the env var on **api** and **worker**, rebuild. First boot downloads weights (~1GB+). |
+| `perceptual` (**default**) | `visual-shop/perceptual-v1` | Fully offline / CI — no weight download |
+| `siglip2` | `google/siglip2-base-patch16-224` | Online only |
 
-Indexing path (admin or seed):
+**Opt into SigLIP2 when online:**
 
-1. Upload image → MinIO (`product_images`, status `pending`)
-2. Celery `embeddings.generate_for_image` → preprocess → encode → upsert `image_embeddings` → status `ready`
-3. Customer `POST /api/v1/search/image` encodes with the **same** backend/model name and runs pgvector cosine search (`<=>`), grouped by product, top 20.
+```bash
+cd apps/api
+pip install -r requirements-ml.txt
+# on api + worker:
+export EMBEDDING_BACKEND=siglip2
+# re-seed or reindex so embeddings match the new model_name
+PYTHONPATH=. python -m scripts.seed_catalogue
+```
 
-If Celery/Redis is unavailable, the API falls back to **synchronous** indexing for that upload. Set `INDEX_SYNC=1` to force inline indexing.
+Search only compares embeddings with the **same** `model_name` as the active encoder.
 
-### Storage backends
+### How offline vectors are queried
+
+1. Query image → perceptual encoder → L2-normalized 768-d float list  
+2. Load `image_embeddings` for that `model_name` from MongoDB  
+3. Cosine score = dot product of unit vectors (NumPy)  
+4. Keep best image per product, return top N  
+
+No Atlas cluster is required for this path.
+
+### Storage
 
 | `STORAGE_BACKEND` | Behaviour |
 | --- | --- |
-| `s3` (default in Compose) | MinIO / S3 via boto3. Public URLs use `S3_PUBLIC_ENDPOINT_URL` (e.g. `http://localhost:9000`). |
-| `filesystem` | Local disk under `STORAGE_LOCAL_PATH`, served at `/media/*` (`MEDIA_PUBLIC_BASE`). Handy when MinIO isn’t running. |
+| `s3` | MinIO / S3 |
+| `filesystem` | Disk under `STORAGE_LOCAL_PATH`, served at `/media/*` |
 
 ## Capacitor + Next.js
 
-| Mode | Command | Behaviour |
-| --- | --- | --- |
-| Web / SSR | `npm run dev:storefront` | Primary web path |
-| Capacitor live | set `server.url` in `capacitor.config.ts` | WebView → Next host |
-| Capacitor static | `npm run build:mobile` → `cap:sync` | `CAPACITOR=1` static export to `out/` |
+| Mode | Command |
+| --- | --- |
+| Web SSR | `npm run dev:storefront` / `build:web` |
+| Mobile static | `npm run mobile:prepare` |
 
-Visual search uses `<input capture>` on web and `@capacitor/camera` when the native shell is present.
-
-## Admin indexing API
-
-```bash
-# create product
-curl -s -X POST http://localhost:8000/api/v1/admin/products \
-  -H 'content-type: application/json' \
-  -d '{"name":"Demo Hat","slug":"demo-hat","price_cents":2500}'
-
-# upload image (queues Celery embedding job)
-curl -s -X POST "http://localhost:8000/api/v1/admin/products/<PRODUCT_ID>/images" \
-  -F "file=@./hat.jpg"
-```
-
-## Development notes
-
-- Schema: `apps/api/migrations/001_catalogue_pgvector.sql` (applied on first Postgres boot)
-- Optional ML deps: `apps/api/requirements-ml.txt`
-- Cart / checkout / Auth.js remain stubs for a later milestone
+See `apps/storefront/next.config.ts` for same-origin API/media rewrites (Try Live friendly).

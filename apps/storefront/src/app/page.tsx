@@ -9,22 +9,22 @@ export default function HomePage() {
           Find products by what they look like.
         </h1>
         <p className="max-w-xl text-lg text-ink-100/70">
-          Upload a photo or snap one on your phone — we match it against the catalogue with
-          AI visual search.
+          Browse the catalogue, type a keyword, or tap the camera in the search bar to match a
+          photo against the shop.
         </p>
       </div>
       <div className="flex flex-wrap gap-3">
         <Link
-          href="/visual-search"
+          href="/products"
           className="rounded-md bg-leaf-500 px-5 py-2.5 text-sm font-medium text-ink-900 transition hover:bg-leaf-400"
         >
-          Try visual search
+          Browse products
         </Link>
         <Link
-          href="/products"
+          href="/cart"
           className="rounded-md border border-white/15 px-5 py-2.5 text-sm text-ink-100 transition hover:border-leaf-400/50"
         >
-          Browse products
+          View cart
         </Link>
       </div>
     </section>

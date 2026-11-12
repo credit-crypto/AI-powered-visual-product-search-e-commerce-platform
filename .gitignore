@@ -57,3 +57,4 @@ infrastructure/data/
 *.pem
 .turbo/
 apps/storefront/.env.local
+test-results

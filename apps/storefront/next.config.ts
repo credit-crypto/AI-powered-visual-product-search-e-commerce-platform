@@ -17,6 +17,12 @@ import type { NextConfig } from "next";
  */
 const isCapacitorBuild = process.env.CAPACITOR === "1";
 
+/** Backend the Next server can reach (browser uses same-origin rewrites). */
+const apiInternal =
+  process.env.API_INTERNAL_URL?.replace(/\/$/, "") ||
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  "http://localhost:8000";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   ...(isCapacitorBuild
@@ -25,7 +31,16 @@ const nextConfig: NextConfig = {
         images: { unoptimized: true },
         trailingSlash: true,
       }
-    : {}),
+    : {
+        // Proxy API + media through the storefront origin so Try Live / tunnels
+        // work without the browser needing to reach :8000 directly.
+        async rewrites() {
+          return [
+            { source: "/api/v1/:path*", destination: `${apiInternal}/api/v1/:path*` },
+            { source: "/media/:path*", destination: `${apiInternal}/media/:path*` },
+          ];
+        },
+      }),
 };
 
 export default nextConfig;

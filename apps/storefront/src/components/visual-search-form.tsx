@@ -65,17 +65,45 @@ export function VisualSearchForm() {
     });
   }
 
-  async function onCameraClick() {
+  function openFilePicker() {
+    // Must run synchronously in the click handler — browsers block delayed input.click().
+    inputRef.current?.click();
+  }
+
+  function onCameraClick() {
     setError(null);
-    const captured = await blobFromCapacitorCamera();
-    if (!captured) {
-      inputRef.current?.click();
+
+    // Web / Try Live: open the file picker immediately (preserve user gesture).
+    const isNative = (() => {
+      try {
+        const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+          .Capacitor;
+        return Boolean(cap?.isNativePlatform?.());
+      } catch {
+        return false;
+      }
+    })();
+
+    if (!isNative) {
+      openFilePicker();
       return;
     }
-    setPreviewUrl(URL.createObjectURL(captured.blob));
-    startTransition(() => {
-      void runSearch(captured.blob, captured.name);
-    });
+
+    void (async () => {
+      try {
+        const captured = await blobFromCapacitorCamera();
+        if (!captured) {
+          openFilePicker();
+          return;
+        }
+        setPreviewUrl(URL.createObjectURL(captured.blob));
+        startTransition(() => {
+          void runSearch(captured.blob, captured.name);
+        });
+      } catch {
+        openFilePicker();
+      }
+    })();
   }
 
   return (

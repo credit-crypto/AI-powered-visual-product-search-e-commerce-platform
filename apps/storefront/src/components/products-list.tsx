@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 
-import { listProducts, type ProductSummary } from "@/lib/api";
-
-function formatPrice(cents: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(cents / 100);
-  } catch {
-    return `$${(cents / 100).toFixed(2)}`;
-  }
-}
+import {
+  addToCart,
+  browserAssetUrl,
+  formatMoney,
+  listProducts,
+  type ProductSummary,
+} from "@/lib/api";
 
 export function ProductsList() {
   const [products, setProducts] = useState<ProductSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     listProducts()
@@ -39,27 +39,48 @@ export function ProductsList() {
   }
 
   return (
-    <ul className="divide-y divide-white/10 border border-white/10">
-      {products.map((product) => (
-        <li key={product.id} className="flex items-center gap-4 px-4 py-3">
-          <div className="h-14 w-14 shrink-0 overflow-hidden bg-ink-800">
-            {product.thumbnail_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={product.thumbnail_url}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : null}
-          </div>
-          <div>
-            <p className="text-ink-50">{product.name}</p>
-            <p className="text-sm text-ink-100/60">
-              {formatPrice(product.price_cents, product.currency)}
-            </p>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-3">
+      {message ? <p className="text-sm text-leaf-400">{message}</p> : null}
+      <ul className="divide-y divide-white/10 border border-white/10">
+        {products.map((product) => (
+          <li key={product.id} className="flex flex-wrap items-center gap-4 px-4 py-3">
+            <div className="h-14 w-14 shrink-0 overflow-hidden bg-ink-800">
+              {browserAssetUrl(product.thumbnail_url) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={browserAssetUrl(product.thumbnail_url)}
+                  alt={product.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-ink-50">{product.name}</p>
+              <p className="text-sm text-ink-100/60">
+                {formatMoney(product.price_cents, product.currency)}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isPending || !product.default_variant_id}
+              className="rounded-md border border-white/15 px-3 py-1.5 text-sm text-ink-100 transition hover:border-leaf-400/50 disabled:opacity-40"
+              onClick={() => {
+                if (!product.default_variant_id) return;
+                setMessage(null);
+                startTransition(() => {
+                  void addToCart(product.default_variant_id!)
+                    .then(() => setMessage(`Added ${product.name} to cart`))
+                    .catch((err: unknown) =>
+                      setError(err instanceof Error ? err.message : "Add failed"),
+                    );
+                });
+              }}
+            >
+              Add to cart
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

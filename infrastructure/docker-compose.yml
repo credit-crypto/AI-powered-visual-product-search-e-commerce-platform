@@ -1,18 +1,13 @@
 services:
-  db:
-    image: pgvector/pgvector:pg16
-    container_name: visualshop-db
-    environment:
-      POSTGRES_USER: visualshop
-      POSTGRES_PASSWORD: visualshop
-      POSTGRES_DB: visualshop
+  mongo:
+    image: mongo:7
+    container_name: visualshop-mongo
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ../apps/api/migrations/001_catalogue_pgvector.sql:/docker-entrypoint-initdb.d/001_catalogue_pgvector.sql:ro
+      - mongodata:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U visualshop -d visualshop"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -69,23 +64,29 @@ services:
     environment: &api-env
       ENVIRONMENT: development
       DEBUG: "true"
-      DATABASE_URL: postgresql+asyncpg://visualshop:visualshop@db:5432/visualshop
-      DATABASE_URL_SYNC: postgresql://visualshop:visualshop@db:5432/visualshop
+      API_PUBLIC_BASE: http://localhost:8000
+      STOREFRONT_PUBLIC_BASE: http://localhost:3000
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: visualshop
       REDIS_URL: redis://redis:6379/0
+      STORAGE_BACKEND: s3
       S3_ENDPOINT_URL: http://minio:9000
       S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
       S3_ACCESS_KEY: minioadmin
       S3_SECRET_KEY: minioadmin
       S3_BUCKET: visual-shop
       CORS_ORIGINS: http://localhost:3000,capacitor://localhost,http://localhost
-      # Default demo backend: CPU-friendly perceptual 768-d vectors.
-      # Set EMBEDDING_BACKEND=siglip2 and install requirements-ml.txt for real SigLIP2.
+      # Offline default — no HuggingFace / SigLIP2 download
       EMBEDDING_BACKEND: perceptual
       EMBEDDING_MODEL_NAME: google/siglip2-base-patch16-224
+      INDEX_SYNC: "0"
+      PAYMENT_PROVIDER: stub
+      STUB_PAYMENT_SECRET: visual-shop-stub-secret
+      # Online opt-in: EMBEDDING_BACKEND=siglip2 (+ requirements-ml.txt)
     ports:
       - "8000:8000"
     depends_on:
-      db:
+      mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -103,7 +104,7 @@ services:
     environment:
       <<: *api-env
     depends_on:
-      db:
+      mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -122,12 +123,13 @@ services:
     environment:
       <<: *api-env
       SEED_USE_CELERY: "0"
+      INDEX_SYNC: "1"
     depends_on:
       api:
         condition: service_started
       worker:
         condition: service_started
-      db:
+      mongo:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
@@ -137,5 +139,5 @@ services:
     restart: "no"
 
 volumes:
-  pgdata:
+  mongodata:
   miniodata:
