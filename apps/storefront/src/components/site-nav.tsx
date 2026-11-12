@@ -9,6 +9,7 @@ const links = [
   { href: "/cart", label: "Cart" },
   { href: "/checkout", label: "Checkout" },
   { href: "/account/orders", label: "Orders" },
+  { href: "/admin", label: "Admin" },
 ];
 
 export function SiteNav() {

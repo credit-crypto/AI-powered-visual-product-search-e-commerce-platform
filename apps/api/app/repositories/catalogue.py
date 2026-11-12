@@ -29,7 +29,11 @@ def create_product(
     price_cents: int,
     currency: str = "USD",
     status: str = "active",
+    sku: str | None = None,
+    stock_qty: int = 25,
 ) -> dict[str, Any]:
+    variant_sku = (sku or "").strip() or f"{slug}-default"
+    qty = max(0, int(stock_qty))
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -49,7 +53,7 @@ def create_product(
                 VALUES (%s, %s, %s, %s, %s, true)
                 RETURNING id
                 """,
-                (product_id, f"{slug}-default", "Default", price_cents, currency),
+                (product_id, variant_sku, "Default", price_cents, currency),
             )
             variant_id = cur.fetchone()[0]
             cur.execute(
@@ -57,7 +61,7 @@ def create_product(
                 INSERT INTO inventory (variant_id, quantity_on_hand, quantity_reserved)
                 VALUES (%s, %s, 0)
                 """,
-                (variant_id, 25),
+                (variant_id, qty),
             )
     return {
         "id": product_id,
@@ -65,6 +69,8 @@ def create_product(
         "slug": product[2],
         "status": product[3],
         "variant_id": variant_id,
+        "sku": variant_sku,
+        "stock_qty": qty,
     }
 
 
@@ -182,6 +188,143 @@ def list_product_image_ids(product_id: UUID) -> list[UUID]:
             (product_id,),
         )
         return [row["id"] for row in cur.fetchall()]
+
+
+def count_product_images(product_id: UUID) -> int:
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT COUNT(*) AS n FROM product_images WHERE product_id = %s",
+            (product_id,),
+        )
+        row = cur.fetchone()
+        return int(row["n"] if row else 0)
+
+
+def list_product_images(product_id: UUID) -> list[dict[str, Any]]:
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT pi.id, pi.product_id, pi.url, pi.status, pi.width, pi.height,
+                   pi.is_primary, pi.position, pi.created_at,
+                   EXISTS(
+                     SELECT 1 FROM image_embeddings e
+                     WHERE e.product_image_id = pi.id
+                   ) AS has_embedding
+            FROM product_images pi
+            WHERE pi.product_id = %s
+            ORDER BY pi.is_primary DESC, pi.position ASC, pi.created_at ASC
+            """,
+            (product_id,),
+        )
+        return [dict(row) for row in cur.fetchall()]
+
+
+def list_admin_products(
+    *,
+    q: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = ["TRUE"]
+    params: list[Any] = []
+    if q:
+        clauses.append("(p.name ILIKE %s OR p.slug ILIKE %s OR p.description ILIKE %s)")
+        like = f"%{q}%"
+        params.extend([like, like, like])
+    where = " AND ".join(clauses)
+    params.extend([limit, offset])
+    with get_cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT p.id, p.name, p.slug, p.description, p.status, p.created_at,
+                   v.id AS default_variant_id,
+                   v.sku AS default_sku,
+                   COALESCE(v.price_cents, 0) AS price_cents,
+                   COALESCE(v.currency, 'USD') AS currency,
+                   COALESCE(inv.quantity_on_hand, 0) AS stock_qty,
+                   (
+                     SELECT pi.url FROM product_images pi
+                     WHERE pi.product_id = p.id
+                     ORDER BY pi.is_primary DESC, pi.position ASC, pi.created_at ASC
+                     LIMIT 1
+                   ) AS thumbnail_url,
+                   (
+                     SELECT COUNT(*) FROM product_images pi WHERE pi.product_id = p.id
+                   ) AS image_count,
+                   (
+                     SELECT COUNT(*) FROM product_images pi
+                     WHERE pi.product_id = p.id AND pi.status = 'ready'
+                   ) AS ready_count,
+                   (
+                     SELECT COUNT(*) FROM product_images pi
+                     WHERE pi.product_id = p.id AND pi.status IN ('pending', 'processing')
+                   ) AS pending_count,
+                   (
+                     SELECT COUNT(*) FROM product_images pi
+                     WHERE pi.product_id = p.id AND pi.status = 'failed'
+                   ) AS failed_count,
+                   (
+                     SELECT COUNT(*) FROM image_embeddings e WHERE e.product_id = p.id
+                   ) AS embedded_count
+            FROM products p
+            LEFT JOIN product_variants v ON v.product_id = p.id AND v.is_default = true
+            LEFT JOIN inventory inv ON inv.variant_id = v.id
+            WHERE {where}
+            ORDER BY p.created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            params,
+        )
+        return [dict(row) for row in cur.fetchall()]
+
+
+def get_admin_product(product_id: UUID) -> dict[str, Any] | None:
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT p.id, p.name, p.slug, p.description, p.status, p.created_at,
+                   v.id AS default_variant_id,
+                   v.sku AS default_sku,
+                   COALESCE(v.price_cents, 0) AS price_cents,
+                   COALESCE(v.currency, 'USD') AS currency,
+                   COALESCE(inv.quantity_on_hand, 0) AS stock_qty,
+                   (
+                     SELECT pi.url FROM product_images pi
+                     WHERE pi.product_id = p.id
+                     ORDER BY pi.is_primary DESC, pi.position ASC, pi.created_at ASC
+                     LIMIT 1
+                   ) AS thumbnail_url,
+                   (
+                     SELECT COUNT(*) FROM product_images pi WHERE pi.product_id = p.id
+                   ) AS image_count,
+                   (
+                     SELECT COUNT(*) FROM product_images pi
+                     WHERE pi.product_id = p.id AND pi.status = 'ready'
+                   ) AS ready_count,
+                   (
+                     SELECT COUNT(*) FROM product_images pi
+                     WHERE pi.product_id = p.id AND pi.status IN ('pending', 'processing')
+                   ) AS pending_count,
+                   (
+                     SELECT COUNT(*) FROM product_images pi
+                     WHERE pi.product_id = p.id AND pi.status = 'failed'
+                   ) AS failed_count,
+                   (
+                     SELECT COUNT(*) FROM image_embeddings e WHERE e.product_id = p.id
+                   ) AS embedded_count
+            FROM products p
+            LEFT JOIN product_variants v ON v.product_id = p.id AND v.is_default = true
+            LEFT JOIN inventory inv ON inv.variant_id = v.id
+            WHERE p.id = %s
+            """,
+            (product_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        product = dict(row)
+        product["images"] = list_product_images(product_id)
+        return product
 
 
 def set_product_image_status(image_id: UUID, status: str) -> None:

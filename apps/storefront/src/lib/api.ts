@@ -261,3 +261,144 @@ export function formatMoney(cents: number, currency = "USD"): string {
     return `$${(cents / 100).toFixed(2)}`;
   }
 }
+
+/* —— Admin catalogue (MVP: no auth) —— */
+
+export interface AdminProductImage {
+  id: string;
+  url: string;
+  status: string;
+  is_primary: boolean;
+  width?: number | null;
+  height?: number | null;
+  has_embedding: boolean;
+  position: number;
+}
+
+export interface AdminProductSummary {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  status: string;
+  price_cents: number;
+  currency: string;
+  default_sku?: string | null;
+  stock_qty: number;
+  thumbnail_url?: string | null;
+  image_count: number;
+  ready_count: number;
+  pending_count: number;
+  failed_count: number;
+  embedded_count: number;
+  indexing_status: string;
+}
+
+export interface AdminProductDetail extends AdminProductSummary {
+  images: AdminProductImage[];
+}
+
+export interface CreateAdminProductInput {
+  name: string;
+  slug: string;
+  description?: string;
+  price_cents: number;
+  currency?: string;
+  sku?: string;
+  stock_qty?: number;
+}
+
+async function readError(response: Response, fallback: string): Promise<string> {
+  const text = await response.text();
+  try {
+    const parsed = JSON.parse(text) as { detail?: unknown };
+    if (typeof parsed.detail === "string") return parsed.detail;
+    if (parsed.detail != null) return JSON.stringify(parsed.detail);
+  } catch {
+    /* plain text */
+  }
+  return text || fallback;
+}
+
+export async function listAdminProducts(q?: string): Promise<AdminProductSummary[]> {
+  const params = new URLSearchParams({ limit: "100" });
+  if (q?.trim()) params.set("q", q.trim());
+  const response = await apiFetch(`/api/v1/admin/products?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(await readError(response, "Failed to load admin products"));
+  return response.json() as Promise<AdminProductSummary[]>;
+}
+
+export async function getAdminProduct(productId: string): Promise<AdminProductDetail> {
+  const response = await apiFetch(`/api/v1/admin/products/${productId}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(await readError(response, "Product not found"));
+  return response.json() as Promise<AdminProductDetail>;
+}
+
+export async function createAdminProduct(
+  input: CreateAdminProductInput,
+): Promise<{ id: string; status: string; slug?: string; sku?: string }> {
+  const response = await apiFetch("/api/v1/admin/products", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(await readError(response, "Create product failed"));
+  return response.json();
+}
+
+export async function uploadAdminProductImage(
+  productId: string,
+  file: Blob,
+  fileName: string,
+): Promise<{ job_id: string; status: string; product_image_id?: string; url?: string }> {
+  const body = new FormData();
+  body.append("file", file, fileName);
+  const response = await apiFetch(`/api/v1/admin/products/${productId}/images`, {
+    method: "POST",
+    body,
+  });
+  if (!response.ok) throw new Error(await readError(response, "Image upload failed"));
+  return response.json();
+}
+
+export async function reindexAdminProduct(
+  productId: string,
+): Promise<{ job_id: string; status: string }> {
+  const response = await apiFetch(`/api/v1/admin/products/${productId}/reindex`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error(await readError(response, "Reindex failed"));
+  return response.json();
+}
+
+export function slugifyProductName(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+export function indexingStatusLabel(status: string): string {
+  switch (status) {
+    case "ready":
+      return "Indexed";
+    case "pending":
+      return "Pending";
+    case "indexing":
+      return "Indexing";
+    case "failed":
+      return "Failed";
+    case "partial_failed":
+      return "Partial failure";
+    case "no_images":
+      return "No images";
+    default:
+      return status;
+  }
+}
