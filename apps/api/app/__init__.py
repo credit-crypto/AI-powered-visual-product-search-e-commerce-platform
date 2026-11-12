@@ -1,0 +1,1 @@
+"""Visual Shop API package."""

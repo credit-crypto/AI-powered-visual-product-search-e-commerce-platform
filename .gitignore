@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+env/
+
+# Build / Next.js
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Capacitor
+apps/storefront/android/
+apps/storefront/ios/
+apps/storefront/.capacitor/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Testing / coverage
+coverage/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker / local data
+infrastructure/data/
+
+# Python packaging
+*.egg-info/
+.eggs/
+
+# Misc
+*.pem
+.turbo/
