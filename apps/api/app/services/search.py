@@ -1,15 +1,13 @@
-"""Vector similarity search interface over pgvector.
-
-Next milestone: cosine nearest-neighbour query against image_embeddings
-(HNSW), group by product_id, apply category filters / rerank.
-"""
+"""Vector similarity search over pgvector."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from uuid import UUID
 
+from app.repositories import catalogue as catalogue_repo
 from app.schemas.search import VisualSearchResultItem
+from app.services.encoder import get_encoder
 
 
 class SearchService(ABC):
@@ -23,16 +21,32 @@ class SearchService(ABC):
         """Return products nearest to the query embedding."""
 
 
-class StubSearchService(SearchService):
+class PgvectorSearchService(SearchService):
     async def similar_products(
         self,
         embedding: list[float],
         limit: int = 20,
         category_id: UUID | None = None,
     ) -> list[VisualSearchResultItem]:
-        # TODO: SELECT ... ORDER BY embedding <=> :query LIMIT :limit using pgvector.
-        _ = (embedding, limit, category_id)
-        return []
+        encoder = get_encoder()
+        rows = catalogue_repo.search_similar(
+            embedding=embedding,
+            limit=limit,
+            category_id=category_id,
+            model_name=encoder.model_name,
+        )
+        return [
+            VisualSearchResultItem(
+                product_id=row["product_id"],
+                score=float(row["score"]),
+                image_id=row["image_id"],
+                name=row["name"],
+                thumbnail_url=row["thumbnail_url"],
+                price_cents=int(row["price_cents"]) if row.get("price_cents") is not None else None,
+                currency=row.get("currency"),
+            )
+            for row in rows
+        ]
 
 
 _search_service: SearchService | None = None
@@ -41,5 +55,5 @@ _search_service: SearchService | None = None
 def get_search_service() -> SearchService:
     global _search_service
     if _search_service is None:
-        _search_service = StubSearchService()
+        _search_service = PgvectorSearchService()
     return _search_service

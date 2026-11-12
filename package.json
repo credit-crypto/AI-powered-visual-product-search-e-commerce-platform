@@ -12,7 +12,8 @@
     "build:storefront": "npm run build -w @visual-shop/storefront",
     "build:mobile": "npm run mobile:prepare -w @visual-shop/storefront",
     "docker:up": "docker compose -f infrastructure/docker-compose.yml up --build",
-    "docker:down": "docker compose -f infrastructure/docker-compose.yml down"
+    "docker:down": "docker compose -f infrastructure/docker-compose.yml down",
+    "docker:seed": "docker compose -f infrastructure/docker-compose.yml --profile seed run --rm seed"
   },
   "engines": {
     "node": ">=20"

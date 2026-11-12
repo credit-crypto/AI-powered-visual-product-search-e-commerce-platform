@@ -1,14 +1,18 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1 import admin, cart, orders, products, search
 from app.core.config import get_settings
+from app.services.encoder import get_encoder
 
 settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -27,7 +31,24 @@ app.include_router(admin.router, prefix=settings.api_v1_prefix)
 app.include_router(cart.router, prefix=settings.api_v1_prefix)
 app.include_router(orders.router, prefix=settings.api_v1_prefix)
 
+if settings.storage_backend.lower() in {"filesystem", "local", "file"}:
+    media_root = Path(settings.storage_local_path)
+    media_root.mkdir(parents=True, exist_ok=True)
+    app.mount("/media", StaticFiles(directory=str(media_root)), name="media")
+
+
+@app.on_event("startup")
+def warm_encoder() -> None:
+    get_encoder()
+
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": settings.app_name}
+    encoder = get_encoder()
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "embedding_backend": settings.embedding_backend,
+        "embedding_model": encoder.model_name,
+        "storage_backend": settings.storage_backend,
+    }

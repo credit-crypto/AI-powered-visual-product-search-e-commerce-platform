@@ -1,6 +1,6 @@
 /**
- * Minimal shared API contracts for Visual Shop.
- * Keep in sync with FastAPI `/api/v1` stubs; generate OpenAPI clients later.
+ * Shared API contracts for Visual Shop.
+ * Keep in sync with FastAPI `/api/v1`.
  */
 
 export interface ProductSummary {
@@ -18,17 +18,23 @@ export interface VisualSearchResultItem {
   image_id?: string | null;
   name?: string | null;
   thumbnail_url?: string | null;
+  price_cents?: number | null;
+  currency?: string | null;
 }
 
 export interface VisualSearchResponse {
   results: VisualSearchResultItem[];
   query_ms?: number | null;
+  model_name?: string | null;
+  search_event_id?: string | null;
   message?: string | null;
 }
 
 export interface HealthResponse {
   status: string;
   service: string;
+  embedding_backend?: string;
+  embedding_model?: string;
 }
 
 export const API_V1_PREFIX = "/api/v1" as const;

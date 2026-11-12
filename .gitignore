@@ -56,3 +56,4 @@ infrastructure/data/
 # Misc
 *.pem
 .turbo/
+apps/storefront/.env.local

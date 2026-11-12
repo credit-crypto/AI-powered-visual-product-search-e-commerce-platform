@@ -9,11 +9,15 @@ class VisualSearchResultItem(BaseModel):
     image_id: UUID | None = None
     name: str | None = None
     thumbnail_url: str | None = None
+    price_cents: int | None = None
+    currency: str | None = None
 
 
 class VisualSearchResponse(BaseModel):
     results: list[VisualSearchResultItem] = Field(default_factory=list)
     query_ms: int | None = None
+    model_name: str | None = None
+    search_event_id: UUID | None = None
     message: str | None = None
 
 

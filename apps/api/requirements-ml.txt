@@ -1,0 +1,10 @@
+# Optional — only needed when EMBEDDING_BACKEND=siglip2
+# Install on top of requirements.txt:
+#   pip install -r requirements.txt -r requirements-ml.txt
+#
+# Downloads google/siglip2-base-patch16-224 (~1GB+). Prefer GPU; CPU works but is slow.
+torch==2.5.1
+torchvision==0.20.1
+transformers==4.47.1
+sentencepiece==0.2.0
+accelerate==1.2.1
