@@ -4,8 +4,9 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/products", label: "Products" },
   { href: "/visual-search", label: "Visual Search" },
-  { href: "/search/results", label: "Results" },
   { href: "/cart", label: "Cart" },
+  { href: "/checkout", label: "Checkout" },
+  { href: "/account/orders", label: "Orders" },
   { href: "/admin", label: "Admin" },
 ];
 

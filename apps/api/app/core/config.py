@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     environment: str = "development"
     debug: bool = True
+    api_public_base: str = "http://localhost:8000"
+    storefront_public_base: str = "http://localhost:3000"
 
     database_url: str = "postgresql+asyncpg://visualshop:visualshop@localhost:5432/visualshop"
     database_url_sync: str = "postgresql://visualshop:visualshop@localhost:5432/visualshop"
@@ -22,7 +24,6 @@ class Settings(BaseSettings):
 
     # S3-compatible storage (MinIO locally)
     s3_endpoint_url: str = "http://localhost:9000"
-    # Browser-facing base (storefront loads images from here; defaults to endpoint)
     s3_public_endpoint_url: str = "http://localhost:9000"
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
@@ -39,6 +40,13 @@ class Settings(BaseSettings):
     min_image_side: int = 32
     max_image_side: int = 4096
     search_default_limit: int = 20
+
+    # Payments: "stub" (default demo) or "stripe"
+    payment_provider: str = "stub"
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_publishable_key: str = ""
+    stub_payment_secret: str = "visual-shop-stub-secret"
 
     @property
     def cors_origin_list(self) -> list[str]:

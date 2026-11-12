@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import admin, cart, orders, products, search
+from app.api.v1 import admin, cart, checkout, orders, products, search, webhooks
 from app.core.config import get_settings
 from app.services.encoder import get_encoder
 
@@ -12,7 +12,7 @@ settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.2.0",
+    version="0.3.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -23,13 +23,16 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Session-Token"],
 )
 
 app.include_router(products.router, prefix=settings.api_v1_prefix)
 app.include_router(search.router, prefix=settings.api_v1_prefix)
 app.include_router(admin.router, prefix=settings.api_v1_prefix)
 app.include_router(cart.router, prefix=settings.api_v1_prefix)
+app.include_router(checkout.router, prefix=settings.api_v1_prefix)
 app.include_router(orders.router, prefix=settings.api_v1_prefix)
+app.include_router(webhooks.router, prefix=settings.api_v1_prefix)
 
 if settings.storage_backend.lower() in {"filesystem", "local", "file"}:
     media_root = Path(settings.storage_local_path)
@@ -51,4 +54,5 @@ async def health() -> dict[str, str]:
         "embedding_backend": settings.embedding_backend,
         "embedding_model": encoder.model_name,
         "storage_backend": settings.storage_backend,
+        "payment_provider": settings.payment_provider,
     }

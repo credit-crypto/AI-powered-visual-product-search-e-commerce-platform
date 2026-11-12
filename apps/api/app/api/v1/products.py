@@ -15,12 +15,14 @@ class ProductSummary(BaseModel):
     price_cents: int
     currency: str = "USD"
     thumbnail_url: str | None = None
+    default_variant_id: UUID | None = None
 
 
 class ProductDetail(ProductSummary):
     description: str | None = None
     category_id: UUID | None = None
     image_urls: list[str] = Field(default_factory=list)
+    default_sku: str | None = None
 
 
 @router.get("", response_model=list[ProductSummary])
@@ -41,6 +43,7 @@ async def list_products(
             price_cents=int(row["price_cents"] or 0),
             currency=row.get("currency") or "USD",
             thumbnail_url=row.get("thumbnail_url"),
+            default_variant_id=row.get("default_variant_id"),
         )
         for row in rows
     ]
@@ -61,4 +64,6 @@ async def get_product(product_id: UUID) -> ProductDetail:
         currency=row.get("currency") or "USD",
         thumbnail_url=row.get("thumbnail_url"),
         image_urls=[row["thumbnail_url"]] if row.get("thumbnail_url") else [],
+        default_variant_id=row.get("default_variant_id"),
+        default_sku=row.get("default_sku"),
     )

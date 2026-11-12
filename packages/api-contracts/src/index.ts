@@ -10,6 +10,7 @@ export interface ProductSummary {
   price_cents: number;
   currency: string;
   thumbnail_url?: string | null;
+  default_variant_id?: string | null;
 }
 
 export interface VisualSearchResultItem {
@@ -30,11 +31,46 @@ export interface VisualSearchResponse {
   message?: string | null;
 }
 
+export interface CartItem {
+  variant_id: string;
+  quantity: number;
+  product_name?: string | null;
+  unit_price_cents?: number | null;
+  line_total_cents?: number | null;
+}
+
+export interface CartResponse {
+  id: string;
+  session_token: string;
+  items: CartItem[];
+  subtotal_cents: number;
+  currency: string;
+}
+
+export interface CheckoutSessionResponse {
+  order_id: string;
+  status: string;
+  total_cents: number;
+  currency: string;
+  payment_provider: string;
+  checkout_session_id: string;
+  payment_url: string;
+}
+
+export interface OrderSummary {
+  id: string;
+  status: string;
+  total_cents: number;
+  currency: string;
+  email?: string | null;
+}
+
 export interface HealthResponse {
   status: string;
   service: string;
   embedding_backend?: string;
   embedding_model?: string;
+  payment_provider?: string;
 }
 
 export const API_V1_PREFIX = "/api/v1" as const;
@@ -45,6 +81,8 @@ export const routes = {
   searchImage: `${API_V1_PREFIX}/search/image`,
   searchFeedback: `${API_V1_PREFIX}/search/feedback`,
   cart: `${API_V1_PREFIX}/cart`,
-  checkout: `${API_V1_PREFIX}/orders/checkout`,
+  checkoutSession: `${API_V1_PREFIX}/checkout/session`,
+  paymentWebhook: `${API_V1_PREFIX}/webhooks/payments`,
+  orders: `${API_V1_PREFIX}/orders`,
   adminProducts: `${API_V1_PREFIX}/admin/products`,
 } as const;

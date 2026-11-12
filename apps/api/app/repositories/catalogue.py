@@ -73,6 +73,7 @@ def get_product(product_id: UUID) -> dict[str, Any] | None:
         cur.execute(
             """
             SELECT p.id, p.name, p.slug, p.description, p.category_id, p.status,
+                   v.id AS default_variant_id, v.sku AS default_sku,
                    v.price_cents, v.currency,
                    (
                      SELECT pi.url FROM product_images pi
@@ -111,6 +112,7 @@ def list_products(
         cur.execute(
             f"""
             SELECT p.id, p.name, p.slug,
+                   v.id AS default_variant_id,
                    COALESCE(v.price_cents, 0) AS price_cents,
                    COALESCE(v.currency, 'USD') AS currency,
                    (

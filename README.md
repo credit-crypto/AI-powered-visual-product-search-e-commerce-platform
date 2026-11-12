@@ -55,7 +55,36 @@ npm run dev:storefront
 
 Open http://localhost:3000/visual-search → upload any seeded-style image (or a photo of a similar colour/shape) → `/search/results` shows the top matches.
 
-### 4. API-only smoke test
+### 4. Cart + checkout (stub payment)
+
+Existing DBs need the checkout migration once:
+
+```bash
+psql "postgresql://visualshop:visualshop@localhost:5432/visualshop" \
+  -f apps/api/migrations/002_cart_checkout.sql
+```
+
+(Fresh Compose volumes apply `001` + `002` automatically.)
+
+1. Open http://localhost:3000/products → **Add to cart**
+2. http://localhost:3000/cart → adjust qty → **Checkout**
+3. Enter any email → **Pay now** → stub payment page → **Pay now (stub)**
+4. Lands on `/account/orders?paid=1` — look up by the same email
+
+Guest cart uses the `X-Session-Token` header (storefront keeps it in `localStorage`). Capacitor WebViews work the same way.
+
+**Payments:** default `PAYMENT_PROVIDER=stub` (no Stripe account). For Stripe test mode:
+
+```bash
+PAYMENT_PROVIDER=stripe
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+# forward webhooks: stripe listen --forward-to localhost:8000/api/v1/webhooks/payments
+```
+
+Webhook `POST /api/v1/webhooks/payments` is idempotent via `payment_events (provider, event_id)`.
+
+### 5. API-only smoke test
 
 ```bash
 # after seed — reuse a product image from MinIO or a local JPEG

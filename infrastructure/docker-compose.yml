@@ -11,6 +11,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ../apps/api/migrations/001_catalogue_pgvector.sql:/docker-entrypoint-initdb.d/001_catalogue_pgvector.sql:ro
+      - ../apps/api/migrations/002_cart_checkout.sql:/docker-entrypoint-initdb.d/002_cart_checkout.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U visualshop -d visualshop"]
       interval: 5s
@@ -69,6 +70,8 @@ services:
     environment: &api-env
       ENVIRONMENT: development
       DEBUG: "true"
+      API_PUBLIC_BASE: http://localhost:8000
+      STOREFRONT_PUBLIC_BASE: http://localhost:3000
       DATABASE_URL: postgresql+asyncpg://visualshop:visualshop@db:5432/visualshop
       DATABASE_URL_SYNC: postgresql://visualshop:visualshop@db:5432/visualshop
       REDIS_URL: redis://redis:6379/0
@@ -78,10 +81,14 @@ services:
       S3_SECRET_KEY: minioadmin
       S3_BUCKET: visual-shop
       CORS_ORIGINS: http://localhost:3000,capacitor://localhost,http://localhost
-      # Default demo backend: CPU-friendly perceptual 768-d vectors.
-      # Set EMBEDDING_BACKEND=siglip2 and install requirements-ml.txt for real SigLIP2.
       EMBEDDING_BACKEND: perceptual
       EMBEDDING_MODEL_NAME: google/siglip2-base-patch16-224
+      # Payments: stub (default demo) or stripe (+ STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET)
+      PAYMENT_PROVIDER: stub
+      STUB_PAYMENT_SECRET: visual-shop-stub-secret
+      # STRIPE_SECRET_KEY: sk_test_...
+      # STRIPE_WEBHOOK_SECRET: whsec_...
+      # STRIPE_PUBLISHABLE_KEY: pk_test_...
     ports:
       - "8000:8000"
     depends_on:
