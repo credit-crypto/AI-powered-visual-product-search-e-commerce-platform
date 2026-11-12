@@ -1,0 +1,21 @@
+{
+  "name": "visual-shop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered visual product search e-commerce monorepo",
+  "workspaces": [
+    "apps/storefront",
+    "packages/api-contracts"
+  ],
+  "scripts": {
+    "dev:storefront": "npm run dev -w @visual-shop/storefront",
+    "build:storefront": "npm run build -w @visual-shop/storefront",
+    "build:mobile": "npm run mobile:prepare -w @visual-shop/storefront",
+    "docker:up": "docker compose -f infrastructure/docker-compose.yml up --build",
+    "docker:down": "docker compose -f infrastructure/docker-compose.yml down",
+    "docker:seed": "docker compose -f infrastructure/docker-compose.yml --profile seed run --rm seed"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

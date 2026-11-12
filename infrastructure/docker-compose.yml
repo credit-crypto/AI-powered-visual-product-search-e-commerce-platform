@@ -1,0 +1,141 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: visualshop-db
+    environment:
+      POSTGRES_USER: visualshop
+      POSTGRES_PASSWORD: visualshop
+      POSTGRES_DB: visualshop
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../apps/api/migrations/001_catalogue_pgvector.sql:/docker-entrypoint-initdb.d/001_catalogue_pgvector.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U visualshop -d visualshop"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: visualshop-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: visualshop-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: visualshop-minio-init
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/visual-shop;
+      mc anonymous set download local/visual-shop;
+      exit 0;
+      "
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    container_name: visualshop-api
+    environment: &api-env
+      ENVIRONMENT: development
+      DEBUG: "true"
+      DATABASE_URL: postgresql+asyncpg://visualshop:visualshop@db:5432/visualshop
+      DATABASE_URL_SYNC: postgresql://visualshop:visualshop@db:5432/visualshop
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: visual-shop
+      CORS_ORIGINS: http://localhost:3000,capacitor://localhost,http://localhost
+      # Default demo backend: CPU-friendly perceptual 768-d vectors.
+      # Set EMBEDDING_BACKEND=siglip2 and install requirements-ml.txt for real SigLIP2.
+      EMBEDDING_BACKEND: perceptual
+      EMBEDDING_MODEL_NAME: google/siglip2-base-patch16-224
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    volumes:
+      - ../apps/api:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    container_name: visualshop-worker
+    environment:
+      <<: *api-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    volumes:
+      - ../apps/api:/app
+    command: celery -A worker.celery_app.celery_app worker --loglevel=info
+
+  seed:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    container_name: visualshop-seed
+    profiles: ["seed"]
+    environment:
+      <<: *api-env
+      SEED_USE_CELERY: "0"
+    depends_on:
+      api:
+        condition: service_started
+      worker:
+        condition: service_started
+      db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    volumes:
+      - ../apps/api:/app
+    command: python -m scripts.seed_catalogue
+    restart: "no"
+
+volumes:
+  pgdata:
+  miniodata:
