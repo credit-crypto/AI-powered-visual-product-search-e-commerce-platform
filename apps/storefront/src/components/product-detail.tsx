@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 
-import { addToCart, formatMoney, getProductBySlug, type ProductDetail } from "@/lib/api";
+import {
+  addToCart,
+  browserAssetUrl,
+  formatMoney,
+  getProductBySlug,
+  type ProductDetail,
+} from "@/lib/api";
 
 export function ProductDetailView({ slug }: { slug: string }) {
   const [product, setProduct] = useState<ProductDetail | null>(null);
@@ -32,7 +38,7 @@ export function ProductDetailView({ slug }: { slug: string }) {
     return <p className="text-sm text-ink-100/50">Loading product…</p>;
   }
 
-  const image = product.image_urls?.[0] || product.thumbnail_url;
+  const image = browserAssetUrl(product.image_urls?.[0] || product.thumbnail_url);
 
   return (
     <div className="grid gap-8 md:grid-cols-2">

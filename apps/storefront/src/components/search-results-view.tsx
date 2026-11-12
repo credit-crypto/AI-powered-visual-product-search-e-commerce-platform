@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import {
   SEARCH_RESULTS_KEY,
+  browserAssetUrl,
   formatMoney,
   type VisualSearchResponse,
   type VisualSearchResultItem,
@@ -12,16 +13,17 @@ import {
 
 function ResultCard({ item }: { item: VisualSearchResultItem }) {
   const href = item.slug ? `/products/${item.slug}` : "/products";
+  const thumb = browserAssetUrl(item.thumbnail_url);
   return (
     <Link
       href={href}
       className="flex gap-4 border-b border-white/10 py-4 transition hover:bg-white/[0.03]"
     >
       <div className="h-24 w-24 shrink-0 overflow-hidden bg-ink-800">
-        {item.thumbnail_url ? (
+        {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={item.thumbnail_url}
+            src={thumb}
             alt={item.name || "Product"}
             className="h-full w-full object-cover"
           />

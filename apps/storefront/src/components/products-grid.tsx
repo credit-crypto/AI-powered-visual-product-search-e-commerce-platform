@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { CatalogueSearch } from "@/components/catalogue-search";
-import { formatMoney, listProducts, type ProductSummary } from "@/lib/api";
+import { browserAssetUrl, formatMoney, listProducts, type ProductSummary } from "@/lib/api";
 
 export function ProductsGrid() {
   const searchParams = useSearchParams();
@@ -53,10 +53,10 @@ export function ProductsGrid() {
                 className="group block h-full overflow-hidden border border-white/10 transition hover:border-leaf-400/40"
               >
                 <div className="aspect-square bg-ink-800">
-                  {product.thumbnail_url ? (
+                  {browserAssetUrl(product.thumbnail_url) ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={product.thumbnail_url}
+                      src={browserAssetUrl(product.thumbnail_url)}
                       alt={product.name}
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                     />

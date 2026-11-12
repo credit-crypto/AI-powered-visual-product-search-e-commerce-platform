@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useTransition } from "react";
 
-import { addToCart, formatMoney, listProducts, type ProductSummary } from "@/lib/api";
+import {
+  addToCart,
+  browserAssetUrl,
+  formatMoney,
+  listProducts,
+  type ProductSummary,
+} from "@/lib/api";
 
 export function ProductsList() {
   const [products, setProducts] = useState<ProductSummary[] | null>(null);
@@ -39,10 +45,10 @@ export function ProductsList() {
         {products.map((product) => (
           <li key={product.id} className="flex flex-wrap items-center gap-4 px-4 py-3">
             <div className="h-14 w-14 shrink-0 overflow-hidden bg-ink-800">
-              {product.thumbnail_url ? (
+              {browserAssetUrl(product.thumbnail_url) ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={product.thumbnail_url}
+                  src={browserAssetUrl(product.thumbnail_url)}
                   alt={product.name}
                   className="h-full w-full object-cover"
                 />

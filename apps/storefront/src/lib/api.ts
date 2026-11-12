@@ -1,7 +1,49 @@
 import { captureSessionToken, sessionHeaders } from "@/lib/session";
 
+/**
+ * Browser calls go same-origin (Next rewrites → API) so Try Live / public
+ * tunnels work. Native Capacitor still needs an absolute API host.
+ * Server-side / SSR uses the internal API URL.
+ */
 export function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
+  const configured =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
+
+  if (typeof window === "undefined") {
+    return (
+      process.env.API_INTERNAL_URL?.replace(/\/$/, "") || configured
+    );
+  }
+
+  try {
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+      .Capacitor;
+    if (cap?.isNativePlatform?.()) {
+      return configured;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Same-origin via next.config rewrites (/api/v1, /media).
+  return "";
+}
+
+/** Rewrite localhost API media URLs to same-origin paths for Try Live. */
+export function browserAssetUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("/")) return url;
+  try {
+    const parsed = new URL(url);
+    const localHost =
+      parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+    if (localHost && (parsed.port === "8000" || parsed.port === "3000" || parsed.port === "")) {
+      return `${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    return url;
+  }
+  return url;
 }
 
 export interface VisualSearchResultItem {

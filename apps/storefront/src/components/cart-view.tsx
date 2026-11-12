@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
 import {
+  browserAssetUrl,
   formatMoney,
   getCart,
   removeCartItem,
@@ -46,9 +47,13 @@ export function CartView() {
         {cart.items.map((item) => (
           <li key={item.variant_id} className="flex flex-wrap items-center gap-4 px-4 py-4">
             <div className="h-16 w-16 shrink-0 overflow-hidden bg-ink-800">
-              {item.thumbnail_url ? (
+              {browserAssetUrl(item.thumbnail_url) ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.thumbnail_url} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={browserAssetUrl(item.thumbnail_url)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               ) : null}
             </div>
             <div className="min-w-0 flex-1">
