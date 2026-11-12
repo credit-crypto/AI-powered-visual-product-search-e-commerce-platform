@@ -5,22 +5,29 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { SEARCH_RESULTS_KEY, searchByImage } from "@/lib/api";
 
-async function blobFromCapacitorCamera(): Promise<{ blob: Blob; name: string } | null> {
+function isNativeCapacitor(): boolean {
   try {
-    const { Camera, CameraResultType, CameraSource } = await import("@capacitor/camera");
-    const photo = await Camera.getPhoto({
-      quality: 85,
-      resultType: CameraResultType.Uri,
-      source: CameraSource.Prompt,
-      width: 1280,
-    });
-    if (!photo.webPath) return null;
-    const response = await fetch(photo.webPath);
-    const blob = await response.blob();
-    return { blob, name: `capture.${photo.format || "jpeg"}` };
+    // Available when running inside a Capacitor WebView shell.
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+      .Capacitor;
+    return Boolean(cap?.isNativePlatform?.());
   } catch {
-    return null;
+    return false;
   }
+}
+
+async function blobFromCapacitorCamera(): Promise<{ blob: Blob; name: string } | null> {
+  const { Camera, CameraResultType, CameraSource } = await import("@capacitor/camera");
+  const photo = await Camera.getPhoto({
+    quality: 85,
+    resultType: CameraResultType.Uri,
+    source: CameraSource.Prompt,
+    width: 1280,
+  });
+  if (!photo.webPath) return null;
+  const response = await fetch(photo.webPath);
+  const blob = await response.blob();
+  return { blob, name: `capture.${photo.format || "jpeg"}` };
 }
 
 type CatalogueSearchProps = {
@@ -72,21 +79,48 @@ export function CatalogueSearch({
     }
   }
 
-  async function onImageClick() {
-    setError(null);
-    const captured = await blobFromCapacitorCamera();
-    if (!captured) {
-      fileRef.current?.click();
+  function openFilePicker() {
+    const input = fileRef.current;
+    if (!input) {
+      setError("Photo picker unavailable");
       return;
     }
-    startTransition(() => {
-      void runImageSearch(captured.blob, captured.name);
-    });
+    // Must run synchronously in the click handler — browsers block delayed input.click().
+    input.click();
+  }
+
+  function onImageClick() {
+    setError(null);
+
+    // Web / Try Live: open the file picker immediately (preserve user gesture).
+    if (!isNativeCapacitor()) {
+      openFilePicker();
+      return;
+    }
+
+    // Native Capacitor shell: camera prompt, with file-picker fallback.
+    void (async () => {
+      try {
+        const captured = await blobFromCapacitorCamera();
+        if (!captured) {
+          openFilePicker();
+          return;
+        }
+        startTransition(() => {
+          void runImageSearch(captured.blob, captured.name);
+        });
+      } catch {
+        openFilePicker();
+      }
+    })();
   }
 
   return (
     <div className={compact ? "w-full max-w-xl" : "w-full"}>
-      <form onSubmit={submitText} className="flex items-stretch gap-0 overflow-hidden rounded-md border border-white/15 bg-ink-900/80">
+      <form
+        onSubmit={submitText}
+        className="flex items-stretch gap-0 overflow-hidden rounded-md border border-white/15 bg-ink-900/80"
+      >
         <input
           type="search"
           value={query}
@@ -104,7 +138,7 @@ export function CatalogueSearch({
         </button>
         <button
           type="button"
-          onClick={() => void onImageClick()}
+          onClick={onImageClick}
           disabled={isPending}
           title="Search by photo"
           aria-label="Search by photo"
@@ -127,15 +161,16 @@ export function CatalogueSearch({
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="environment"
-          className="hidden"
+          className="sr-only"
+          tabIndex={-1}
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (!file) return;
-            startTransition(() => {
-              void runImageSearch(file, file.name);
-            });
+            const selected = file;
             event.target.value = "";
+            startTransition(() => {
+              void runImageSearch(selected, selected.name);
+            });
           }}
         />
       </form>
