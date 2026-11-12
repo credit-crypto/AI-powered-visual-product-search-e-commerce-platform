@@ -6,13 +6,14 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.v1 import admin, cart, checkout, orders, products, search, webhooks
 from app.core.config import get_settings
+from app.db import ensure_indexes
 from app.services.encoder import get_encoder
 
 settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.3.0",
+    version="0.4.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -41,7 +42,8 @@ if settings.storage_backend.lower() in {"filesystem", "local", "file"}:
 
 
 @app.on_event("startup")
-def warm_encoder() -> None:
+def on_startup() -> None:
+    ensure_indexes()
     get_encoder()
 
 
@@ -51,6 +53,7 @@ async def health() -> dict[str, str]:
     return {
         "status": "ok",
         "service": settings.app_name,
+        "database": "mongodb",
         "embedding_backend": settings.embedding_backend,
         "embedding_model": encoder.model_name,
         "storage_backend": settings.storage_backend,

@@ -1,12 +1,12 @@
 """Image embedding encoders.
 
 Backends (set EMBEDDING_BACKEND):
-- perceptual (default): CPU-friendly content-aware 768-d vector for local demos / CI.
-  Uses colour histograms + spatial luminance grid so similar-looking images rank near
-  each other without downloading SigLIP2 weights.
-- siglip2: real `google/siglip2-base-patch16-224` via transformers + torch.
-  Requires optional deps in requirements-ml.txt. Both backends emit L2-normalized
-  VECTOR(768) floats so pgvector cosine distance stays consistent.
+- perceptual (default, offline): CPU-friendly content-aware 768-d vector for local
+  demos / CI. Colour histograms + spatial luminance grid — no HuggingFace download.
+- siglip2 (online opt-in): real `google/siglip2-base-patch16-224` via transformers +
+  torch. Install `requirements-ml.txt`, set EMBEDDING_BACKEND=siglip2 on api+worker,
+  then re-seed or reindex. Both backends emit L2-normalized 768-d floats for MongoDB
+  cosine search.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ class ImageEncoder(ABC):
 
     @abstractmethod
     def encode_image_sync(self, image_bytes: bytes) -> list[float]:
-        """Return an L2-normalized embedding (dim must match pgvector schema)."""
+        """Return an L2-normalized embedding (dim must match stored Mongo vectors)."""
 
     async def encode_image(self, image_bytes: bytes) -> list[float]:
         return self.encode_image_sync(image_bytes)

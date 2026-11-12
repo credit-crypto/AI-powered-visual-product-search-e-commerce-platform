@@ -1,4 +1,4 @@
-"""Vector similarity search over pgvector."""
+"""Vector similarity search over MongoDB embeddings (offline cosine)."""
 
 from __future__ import annotations
 
@@ -21,7 +21,13 @@ class SearchService(ABC):
         """Return products nearest to the query embedding."""
 
 
-class PgvectorSearchService(SearchService):
+class MongoCosineSearchService(SearchService):
+    """In-process cosine search over L2-normalized float arrays in MongoDB.
+
+    No Atlas Vector Search required for local/offline demos. Atlas can be added
+    later behind the same interface if the catalogue grows.
+    """
+
     async def similar_products(
         self,
         embedding: list[float],
@@ -56,5 +62,5 @@ _search_service: SearchService | None = None
 def get_search_service() -> SearchService:
     global _search_service
     if _search_service is None:
-        _search_service = PgvectorSearchService()
+        _search_service = MongoCosineSearchService()
     return _search_service

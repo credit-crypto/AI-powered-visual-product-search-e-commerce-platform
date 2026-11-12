@@ -13,8 +13,9 @@ class Settings(BaseSettings):
     api_public_base: str = "http://localhost:8000"
     storefront_public_base: str = "http://localhost:3000"
 
-    database_url: str = "postgresql+asyncpg://visualshop:visualshop@localhost:5432/visualshop"
-    database_url_sync: str = "postgresql://visualshop:visualshop@localhost:5432/visualshop"
+    # MongoDB (replaces PostgreSQL + pgvector). Local/offline default — no Atlas required.
+    mongodb_uri: str = "mongodb://127.0.0.1:27017"
+    mongodb_db: str = "visualshop"
     redis_url: str = "redis://localhost:6379/0"
 
     # Object storage: "s3" (MinIO/S3) or "filesystem" (local demo / no MinIO)
