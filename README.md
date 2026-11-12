@@ -43,7 +43,7 @@ pip install -r requirements.txt
 PYTHONPATH=. python -m scripts.seed_catalogue
 ```
 
-This creates 8 synthetic products, uploads JPEGs to MinIO, and writes **768-d** embeddings into `image_embeddings` (inline by default so search works immediately).
+This creates **~100** synthetic products (override with `SEED_COUNT=N`), uploads JPEGs to MinIO/filesystem, and writes **768-d** embeddings into `image_embeddings` (inline by default so search works immediately).
 
 ### 3. Storefront
 
